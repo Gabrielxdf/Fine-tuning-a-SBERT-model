@@ -140,3 +140,9 @@ SentenceTransformer(
   (1): Pooling({'word_embedding_dimension': 384, 'pooling_mode_cls_token': True, 'pooling_mode_mean_tokens': False, 'pooling_mode_max_tokens': False, 'pooling_mode_mean_sqrt_len_tokens': False})
 )
 ```
+
+Para maiores informações acesse:
+- https://www.sbert.net/docs/training/overview.html
+- https://www.sbert.net/docs/package_reference/evaluation.html
+- https://www.sbert.net/docs/package_reference/losses.html#cosinesimilarityloss
+- https://www.sbert.net/docs/package_reference/models.html
