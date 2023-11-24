@@ -98,8 +98,7 @@ Realizamos, enfim, o treinamento. Ajustamos o modelo chamando o método ```model
 ---
 # Informações técnicas
 ## Evaluation Results
-
-
+Os resultados das validações estão disponíveis neste [link](https://drive.google.com/file/d/1tH7_3WaKyBvzQb5nUmM8NfTA2kneAad6/view?usp=sharing) em um arquivo CSV.
 
 ## Training
 The model was trained with the parameters:
