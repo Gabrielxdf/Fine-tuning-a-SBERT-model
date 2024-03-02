@@ -2,6 +2,10 @@
 #### Ajuste fino de um modelo Setence-BERT utilizado no site [Vagas Anápolis](https://vagas.bcc.ifg.edu.br/) para recomendação de currículos e vagas. Todo este ajuste-fino foi baseado no artigo [conSultantBERT: Fine-tuned Siamese Sentence-BERT for Matching Jobs and Job Seekers](https://arxiv.org/abs/2109.06501) e o código foi baseado nesse tutorial do [SBERT](https://www.sbert.net/docs/training/overview.html)
 
 ---
+# Google Colab
+Você pode executar esse código utilizando a GPU gratuita ofertada pelo Google através do [link](https://colab.research.google.com/github/Gabrielxdf/MachineLearning/blob/main/SBERT_FINE_TUNNING.ipynb).
+
+---
 # Primeiro, vamos falar sobre os dados
 Os dados são compostos em um arquivo CSV contendo os seguinte campos:
 
@@ -90,6 +94,50 @@ model.fit(train_objectives=[(train_dataloader, train_loss)], epochs=5, evaluator
 Realizamos, enfim, o treinamento. Ajustamos o modelo chamando o método ```model.fit()```. Passamos uma lista de ```train_objectives```, os nossos objetivos de treinamento, que consiste em uma tupla ```(dataloader, loss_function)```. Também passamos nosso método de validação, juntamente com ```show_progress_bar=True``` para que seja exibida uma barra de progresso durante o processamento e  ```output_path``` para indicar o caminho onde será salvo o melhor modelo.
 
 ---
+# Vamos testar!
+Vamos testar nosso ajuste fino com um simples protótipo de um sistema de recomendação de vagas para um currículo.
+
+```python
+test_curriculo = 'Nome: Laura Costa - Objetivo: Busco uma posição como Analista Econômico, onde posso aplicar minha formação acadêmica em Economia e aprimorar minhas habilidades em análise econômica. Formação Acadêmica: Bacharelado em Economia - Universidade Federal de Estado Y (-) Experiência Profissional: Assistente de Análise Econômica - Empresa de Consultoria Econômica LTDA - Cidade Financeira, Estado Y (-Presente) Coleta de dados econômicos. Auxílio na elaboração de relatórios e análises. Habilidades: Conhecimentos intermediários em análise econômica. Familiaridade com ferramentas como Excel e SPSS. Idiomas: Inglês: Avançado Espanhol: Básico'
+```
+Vamos usar esse currículo que foi tirado da nossa base de dados para o teste. É o currículo de uma pessoa formada em **Economia** buscando uma vaga de **Analista Econômico**. O objetivo é recomendar as vagas mais similares para esse currículo, em ordem decrescente.
+
+```python
+test_vagas = list(set([test_example.texts[1] for test_example in test_examples]))
+```
+Aqui estamos criando uma lista com todas as vagas do conjunto de teste. A função set() é para criar um conjunto, assim eliminando os registros duplicados. A list() é para transformar o conjunto em uma lista novamente, visto que o conjunto não pode ser acessado por índice, coisa que nos será importante posteriormente.
+
+```python
+embedding_curriculo = model.encode(test_curriculo)
+embedding_vagas = [model.encode(vaga) for vaga in test_vagas]
+```
+Obtendo o embedding do currículo escolhido e de todas as vagas do nosso conjunto de teste. A função que faz isso é a model.encode().
+
+```python
+scores_similaridade = util.cos_sim(embedding_curriculo, embedding_vagas)
+```
+Nesta linha de código, obtém-se o *score* de similaridade de todos os pares currículo-vaga, considerando seus embeddings.
+
+```python
+pares = []
+for index, score in enumerate(scores_similaridade[0]):
+    pares.append({"index": index, "score": score})
+```
+Apenas adicionando um índice para cada similaridade. Esse índice indicará de qual vaga esse *score* se trata. Isso facilitará na hora de recuperar os textos das vagas após a ordenação decrescente das similaridades.
+
+```python
+pares = sorted(pares, key=lambda x: x["score"], reverse=True)
+```
+Ordena os *scores* de similaridade dos pares currículo-vaga do maior para o menor.
+
+```python
+print(f' Currículo: {test_curriculo} \n\n')
+for par in pares[0:5]:
+    print(f' Vaga: {test_vagas[par["index"]]} \n Similaridade predita após o ajuste fino: {par["score"]} \n')
+```
+Por fim, estamos apenas exibindo o currículo e suas 5 vagas mais relevantes, juntamente com o *score* de similaridade obtido.
+
+---
 # Informações técnicas
 ## Evaluation Results
 Os resultados das validações estão disponíveis neste [link](https://drive.google.com/file/d/1FrYwcDT3jFTBsaEdcI9BSVSaBYFvKcNL/view?usp=sharing) em um arquivo CSV.
@@ -140,3 +188,4 @@ Para maiores informações acesse:
 - https://www.sbert.net/docs/package_reference/evaluation.html
 - https://www.sbert.net/docs/package_reference/losses.html#cosinesimilarityloss
 - https://www.sbert.net/docs/package_reference/models.html
+- https://www.sbert.net/docs/usage/semantic_textual_similarity.html
