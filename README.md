@@ -1,71 +1,74 @@
-# Ajuste fino  utilizando o framework Sentence Transformers
-#### Ajuste fino de um modelo Setence-BERT utilizado no site [Vagas Anápolis](https://vagas.bcc.ifg.edu.br/) para recomendação de currículos e vagas. Todo este ajuste-fino foi baseado no artigo [conSultantBERT: Fine-tuned Siamese Sentence-BERT for Matching Jobs and Job Seekers](https://arxiv.org/abs/2109.06501) e o código foi baseado nesse tutorial do [SBERT](https://www.sbert.net/docs/training/overview.html)
+[![pt-br](https://img.shields.io/badge/lang-pt--br-green.svg)](README.pt-br.md)
+# Fine-tuning using the Sentence Transformers framework
+#### Fine-tuning a Setence-BERT model used on the [Vagas Anápolis](https://vagas.bcc.ifg.edu.br/) website to recommend CVs and jobs. All this fine-tuning was based on the [conSultantBERT: Fine-tuned Siamese Sentence-BERT for Matching Jobs and Job Seekers](https://arxiv.org/abs/2109.06501) article and the code was based on this tutorial from [SBERT](https://www.sbert.net/docs/training/overview.html)
 
 ---
 # Google Colab
-Você pode executar esse código utilizando a GPU gratuita ofertada pelo Google através do [link](https://colab.research.google.com/github/Gabrielxdf/MachineLearning/blob/main/SBERT_FINE_TUNNING.ipynb).
+You can run this code using the free GPU offered by Google through [link](https://colab.research.google.com/github/Gabrielxdf/MachineLearning/blob/main/SBERT_FINE_TUNNING.ipynb).
 
 ---
-# Primeiro, vamos falar sobre os dados
-Os dados são compostos em um arquivo CSV contendo os seguinte campos:
+# First, let's talk about the data
+The data is all in portuguese composed in a CSV file containing the following fields:
 
-- curriculos: cada linha neste atributo se refere a todo o texto extraído de um currículo em formato PDF.
-- vagas: cada linha neste atributo contém o texto que descreve a vaga de emprego. Como uma vaga pode estar associada a vários currículos, esse conteúdo pode se repetir para distintos currículos.
-- notas: contendo o grau de relevância entre o currículo e a descrição da vaga. Sendo 1 para baixa relevância, e 5 para alta relevância. Essa anotação foi feita manualmente pelos alunos do projeto Vagas Anápolis.
+- curriculos (CVs): Each line in this attribute refers to all text extracted from a CV in PDF format.
+- vagas (jobs): each line in this attribute contains text that describes the job opening. As a job can be associated with several CVs, this content can be repeated for different CVs.
+- notas (scores): containing the degree of relevance between the resume and the job description. 1 being low relevance, and 5 being high relevance. This annotation was made manually by students from the Vagas Anápolis project.
   
 
 ```python
-def obter_dados_csv():
-    df_dados = pd.read_csv('dados.csv')
-    df_dados.to_csv('dados.csv', index=False, encoding='utf-8')
-    return df_dados
+def get_data_csv():
+    df_data = pd.read_csv('data.csv')
+    df_data.to_csv('data.csv', index=False, encoding='utf-8')
+    return df_data
 
-df_dados = obter_dados_csv()
+df_data = get_data_csv()
 ```
-Carregamos os dados do arquivo [dados.csv](dados.csv) e colocamos em um DataFrame do Pandas para melhor manuseá-lo.
+We load the data from the [data.csv](src/data.csv) file and place it in a Pandas DataFrame to better handle it.
 
 ```python
-df_dados["curriculos"] = df_dados["curriculos"].apply(lambda x: re.sub('\d+', '', x))
-df_dados["vagas"] = df_dados["vagas"].apply(lambda x: re.sub('\d+', '', x))
+df_data["cvs"] = df_data["curriculos"].apply(lambda x: re.sub('\d+', '', x))
+df_data["jobs"] = df_data["vagas"].apply(lambda x: re.sub('\d+', '', x))
 ```
-Removemos os dígitos dos currículos e das vagas.
+We remove digits from cvs and jobs.
 
 ```python
-df_dados["notas"] = min_max_scaler.fit_transform(df_dados["notas"].values.reshape(-1, 1))
+df_data["scores"] = min_max_scaler.fit_transform(df_data["notas"].values.reshape(-1, 1))
 # 1 -> 0.00
 # 2 -> 0.25
 # 3 -> 0.50
 # 4 -> 0.75
 # 5 -> 1.00
 ```
-Para ajustar à função de perda CosineSimilarityLoss, fizemos normalização das notas de relevância usando a estratégia MinMax. Assim as notas máximas recebem 1.0 de similaridade, e as mínimas 0.0.
+To fit the CosineSimilarityLoss loss function, we normalized the relevance scores using the MinMax strategy. Thus, the maximum scores receive 1.0 similarity, and the minimum scores 0.0.
 
 ---
-# Agora, vamos preparar os dados para o treinamento
+# Now, let's prepare the data for training
 
 ```python
 data_examples = []
-for index, row in df_dados.iterrows():
-    data_examples.append(InputExample(texts=[row['curriculos'], row['vagas']], label=row['notas']))
+for index, row in df_data.iterrows():
+    data_examples.append(InputExample(texts=[row['cvs'], row['jobs']], label=row['score']))
 ```
-Criamos uma lista ```data_examples``` que irá conter um ```InputExample``` para cada linha do nosso DataFrame Pandas. O ```InputExample``` é uma estrutura de dados usada para o ajuste fino do SBERT. No nosso caso ela irá conter um par de texto currículo-vaga e sua respectiva similaridade.
+We create a ```data_examples``` list that will contain an ```InputExample``` for each row of our Pandas DataFrame. ```InputExample``` is a data structure used for fine-tuning SBERT. In our case, it will contain a cv-job text pair and their respective similarity.
 
 ```python
 data_examples = shuffle(data_examples, random_state=42)
-indice_treino = int(len(data_examples) * 0.8)
+train_index = int(len(data_examples) * 0.8)
+val_index = int(len(data_examples) * 0.2)
 
-train_examples = data_examples[:indice_treino]
-val_examples = data_examples[indice_treino:]
+train_examples = data_examples[:train_index]
+val_examples = data_examples[train_index:train_index+val_index]
+test_examples = data_examples[train_index+val_index:]
 ```
-Estamos dividindo os dados em 80% para treino e 20% para validação.
+We are splitting the data into 60% for training, 20% for validation and 20% for tests.
 
 ```python
 train_dataloader = DataLoader(train_examples, shuffle=True, batch_size=4)
 ```
-Criando um DataLoader do PyTorch com os dados de treinamento, para que possamos iterar sobre os dados em lotes com o parâmetro ```batch_size=4```.
+Creating a PyTorch DataLoader with the training data, so we can iterate over the data in batches with the parameter ```batch_size=4```.
 
 ---
-# O ajuste fino
+# The fine-tuning
 ```python
 checkpoint = 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'
 
@@ -73,74 +76,74 @@ word_embedding_model = models.Transformer(checkpoint, cache_dir=f'model/{checkpo
 pooling_model = models.Pooling(word_embedding_model.get_word_embedding_dimension(), pooling_mode='cls')
 model = SentenceTransformer(modules=[word_embedding_model, pooling_model])
 ```
-Seguindo o tutorial do [SBERT](https://www.sbert.net/docs/training/overview.html), estamos carregando um modelo SBERT pré-treinado. Com as camadas de embedding e uma camada de pooling CLS. O modelo utilizado na camdada de embedding neste exemplo é o ```sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2```, por padrão, ele gera um embedding de 384 dimensões, para mais informações sobre este modelo consulte o [link](https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2).\
-Para alterar o método de pooling, basta alterar o parâmetro ```pooling_mode``` para ```'mean'```, por exemplo.
+Following the [SBERT](https://www.sbert.net/docs/training/overview.html) tutorial, we are loading a pre-trained SBERT model, with embedding layers and a CLS pooling layer. The model used in the embedding layer in this example is ```sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2```. By default, it generates a 384-dimensional embedding, for more information about this model see the [link](https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2).\
+To change the pooling method, simply change the ```pooling_mode``` parameter to ```'mean'```, for example.
 
 ```python
 train_loss = losses.CosineSimilarityLoss(model)
 ```
 
-Para o treinamento no ajuste fino, utilizamos a função de perda ```CosineSimilarityLoss```, acesse [aqui](https://www.sbert.net/docs/package_reference/losses.html#cosinesimilarityloss) para mais detalhes.\
-Em resumo, para cada currículo-vaga será gerado seus respectivos embeddings e então a similaridade de cosseno desses embeddings é utilizada para correção dos pesos. O resultado é então comparado com uma similaridade de cosseno referência para aquele par currículo-vaga.
+For fine-tuning training, we use the ```CosineSimilarityLoss``` loss function, access [aqui](https://www.sbert.net/docs/package_reference/losses.html#cosinesimilarityloss) for more details.\
+In short, for each cv-job its respective embeddings will be generated and then the cosine similarity score of these embeddings is used to correct the model weights. The result is then compared with a reference cosine similarity score for that cv-job pair.
 
 ```python
 evaluator = evaluation.EmbeddingSimilarityEvaluator.from_input_examples(val_examples, name='sbert')
 ```
-Queremos medir a performance do modelo ao longo do treinamento, para isso vamos utilizar o ```EmbeddingSimilarityEvaluator.from_input_examples()``` com os dados de validação que consiste de ```InputExample```. Essa validação é executada iterativamente durante o treinamento. Além disso, essa validação retorna um score a cada execução e apenas o modelo com o score mais alto será salvo.
+We want to measure the model's performance throughout training, for this we will use ```EmbeddingSimilarityEvaluator.from_input_examples()``` with the validation data consisting of ```InputExample```. This validation is performed iteratively during training. Furthermore, this validation returns a score every run and only the model with the highest score will be saved.
 
 ```python
 model.fit(train_objectives=[(train_dataloader, train_loss)], epochs=5, evaluator=evaluator, show_progress_bar=True, output_path=f'model_FT/{checkpoint}')
 ```
-Realizamos, enfim, o treinamento. Ajustamos o modelo chamando o método ```model.fit()```. Passamos uma lista de ```train_objectives```, os nossos objetivos de treinamento, que consiste em uma tupla ```(dataloader, loss_function)```. Também passamos nosso método de validação, juntamente com ```show_progress_bar=True``` para que seja exibida uma barra de progresso durante o processamento e  ```output_path``` para indicar o caminho onde será salvo o melhor modelo.
+Finally, we carry out the training. We adjust the model by calling the ```model.fit()``` method. We pass a list of ```train_objectives```, which consists of a tuple ```(dataloader, loss_function)```. We also pass our validation method, along with ```show_progress_bar=True``` so that a progress bar is displayed during processing and ```output_path``` to indicate the path where the best model will be saved.
 
 ---
-# Vamos testar!
-Vamos testar nosso ajuste fino com um simples protótipo de um sistema de recomendação de vagas para um currículo.
+# Let's test!
+Let's test our fine-tuning with a simple prototype of a job recommendation system for a resume. Remember, all of our data is in portuguese.
 
 ```python
-test_curriculo = 'Nome: Laura Costa - Objetivo: Busco uma posição como Analista Econômico, onde posso aplicar minha formação acadêmica em Economia e aprimorar minhas habilidades em análise econômica. Formação Acadêmica: Bacharelado em Economia - Universidade Federal de Estado Y (-) Experiência Profissional: Assistente de Análise Econômica - Empresa de Consultoria Econômica LTDA - Cidade Financeira, Estado Y (-Presente) Coleta de dados econômicos. Auxílio na elaboração de relatórios e análises. Habilidades: Conhecimentos intermediários em análise econômica. Familiaridade com ferramentas como Excel e SPSS. Idiomas: Inglês: Avançado Espanhol: Básico'
+cv_test = 'Nome: Laura Costa - Objetivo: Busco uma posição como Analista Econômico, onde posso aplicar minha formação acadêmica em Economia e aprimorar minhas habilidades em análise econômica. Formação Acadêmica: Bacharelado em Economia - Universidade Federal de Estado Y (-) Experiência Profissional: Assistente de Análise Econômica - Empresa de Consultoria Econômica LTDA - Cidade Financeira, Estado Y (-Presente) Coleta de dados econômicos. Auxílio na elaboração de relatórios e análises. Habilidades: Conhecimentos intermediários em análise econômica. Familiaridade com ferramentas como Excel e SPSS. Idiomas: Inglês: Avançado Espanhol: Básico'
 ```
-Vamos usar esse currículo que foi tirado da nossa base de dados para o teste. É o currículo de uma pessoa formada em **Economia** buscando uma vaga de **Analista Econômico**. O objetivo é recomendar as vagas mais similares para esse currículo, em ordem decrescente.
+Let's use this resume that was taken from our database for the test. It is the CV of a person with a degree in **Economics** seeking a position as an **Economic Analyst**. The objective is to recommend the most similar jobs for this CV, in descending order.
 
 ```python
-test_vagas = list(set([test_example.texts[1] for test_example in test_examples]))
+jobs_test = list(set([test_example.texts[1] for test_example in test_examples]))
 ```
-Aqui estamos criando uma lista com todas as vagas do conjunto de teste. A função set() é para criar um conjunto, assim eliminando os registros duplicados. A list() é para transformar o conjunto em uma lista novamente, visto que o conjunto não pode ser acessado por índice, coisa que nos será importante posteriormente.
+Here we are creating a list of all the jobs in the test set. The set() function is to create a set, thus eliminating duplicate records. list() is to transform the set into a list again, since the set cannot be accessed by index, something that will be important to us later.
 
 ```python
-embedding_curriculo = model.encode(test_curriculo)
-embedding_vagas = [model.encode(vaga) for vaga in test_vagas]
+cv_embedding = model.encode(cv_test)
+jobs_embedding = [model.encode(vaga) for vaga in jobs_test]
 ```
-Obtendo o embedding do currículo escolhido e de todas as vagas do nosso conjunto de teste. A função que faz isso é a model.encode().
+Obtaining the embedding of the chosen resume and all jobs in our test set. The function that does this is model.encode().
 
 ```python
-scores_similaridade = util.cos_sim(embedding_curriculo, embedding_vagas)
+similarity_score = util.cos_sim(cv_embedding, jobs_embedding)
 ```
-Nesta linha de código, obtém-se o *score* de similaridade de todos os pares currículo-vaga, considerando seus embeddings.
+In this line of code, the similarity *score* of all cv-job pairs is obtained, considering their embeddings.
 
 ```python
-pares = []
-for index, score in enumerate(scores_similaridade[0]):
-    pares.append({"index": index, "score": score})
+pairs = []
+for index, score in enumerate(similarity_score[0]):
+    pairs.append({"index": index, "score": score})
 ```
-Apenas adicionando um índice para cada similaridade. Esse índice indicará de qual vaga esse *score* se trata. Isso facilitará na hora de recuperar os textos das vagas após a ordenação decrescente das similaridades.
+Just adding an index for each similarity score. This index will indicate which job this *score* is about. This will make it easier to retrieve the texts of jobs after sorting the similarity scores in descending order.
 
 ```python
-pares = sorted(pares, key=lambda x: x["score"], reverse=True)
+pairs = sorted(pairs, key=lambda x: x["score"], reverse=True)
 ```
-Ordena os *scores* de similaridade dos pares currículo-vaga do maior para o menor.
+Order the similarity *scores* of cv-job pairs from highest to lowest.
 
 ```python
-print(f' Currículo: {test_curriculo} \n\n')
-for par in pares[0:5]:
-    print(f' Vaga: {test_vagas[par["index"]]} \n Similaridade predita após o ajuste fino: {par["score"]} \n')
+print(f' CV: {cv_test} \n\n')
+for pair in pairs[0:5]:
+    print(f' Job: {jobs_test[pair["index"]]} \n Predicted similarity score after fine-tuning: {pair["score"]} \n')
 ```
-Por fim, estamos apenas exibindo o currículo e suas 5 vagas mais relevantes, juntamente com o *score* de similaridade obtido.
+Finally, we are just displaying the CV and its 5 most relevant jobs, along with the *similarity score* obtained.
 
 ---
-# Informações técnicas
+# Technical information
 ## Evaluation Results
-Os resultados das validações estão disponíveis neste [link](https://drive.google.com/file/d/1FrYwcDT3jFTBsaEdcI9BSVSaBYFvKcNL/view?usp=sharing) em um arquivo CSV.
+Validation results are available at this [link](https://drive.google.com/file/d/1FrYwcDT3jFTBsaEdcI9BSVSaBYFvKcNL/view?usp=sharing) in a CSV file.
 
 ## Training
 The model was trained with the parameters:
