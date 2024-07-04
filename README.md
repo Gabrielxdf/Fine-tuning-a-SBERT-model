@@ -1,6 +1,6 @@
 [![pt-br](https://img.shields.io/badge/lang-pt--br-green.svg)](README.pt-br.md)
 # Fine-tuning using the Sentence Transformers framework
-#### Fine-tuning a Setence-BERT model used on the [Vagas Anápolis](https://vagas.bcc.ifg.edu.br/) website to recommend CVs and jobs. All this fine-tuning was based on the [conSultantBERT: Fine-tuned Siamese Sentence-BERT for Matching Jobs and Job Seekers](https://arxiv.org/abs/2109.06501) article and the code was based on this tutorial from [SBERT](https://www.sbert.net/docs/training/overview.html)
+#### Fine-tuning a Sentence-BERT model used on the [Vagas Anápolis](https://vagas.bcc.ifg.edu.br/) website to recommend CVs and jobs. All this fine-tuning was based on the [conSultantBERT: Fine-tuned Siamese Sentence-BERT for Matching Jobs and Job Seekers](https://arxiv.org/abs/2109.06501) article and the code was based on this tutorial from [SBERT](https://www.sbert.net/docs/training/overview.html)
 
 ---
 # Google Colab
